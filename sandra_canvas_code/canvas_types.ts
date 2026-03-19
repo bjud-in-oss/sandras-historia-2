@@ -10,6 +10,7 @@ export interface CanvasElement {
   width?: number;
   height?: number;
   opacity?: number; // 0 to 1
+  locked?: boolean;
 }
 
 export interface ImageElement extends CanvasElement {

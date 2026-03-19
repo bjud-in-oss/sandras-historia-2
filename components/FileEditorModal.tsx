@@ -14,6 +14,8 @@ import { uploadToDrive } from '../services/driveService';
 import { CanvasWorkspace } from '../sandra_canvas_code/CanvasWorkspace';
 import { useEditorState } from '../sandra_canvas_code/useEditorState';
 import { EditorElement } from '../sandra_canvas_code/canvas_types';
+import { Toolbar } from '../sandra_canvas_code/Toolbar';
+import { PropertiesPanel } from '../sandra_canvas_code/PropertiesPanel';
 
 // --- SUB-COMPONENT: Sidebar Thumbnail ---
 
@@ -98,6 +100,7 @@ const FileEditorModal: React.FC<FileEditorModalProps> = ({
     const [isCanvasInitialized, setIsCanvasInitialized] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const editorState = useEditorState();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [isLoadingPreview, setIsLoadingPreview] = useState(true);
     const [isSavingImage, setIsSavingImage] = useState(false);
     const [isSavingThumbnail, setIsSavingThumbnail] = useState(false);
@@ -136,6 +139,15 @@ const FileEditorModal: React.FC<FileEditorModalProps> = ({
                 
                 // --- BACKGROUND LAYER LOGIC ---
                 const bgUrl = isPdfType ? previewUrl : item.blobUrl || '';
+                
+                // Calculate dimensions based on image
+                const img = new Image();
+                img.src = bgUrl;
+                await new Promise((resolve) => { img.onload = resolve; });
+                const aspectRatio = img.width / img.height;
+                const canvasWidth = 595;
+                const canvasHeight = 595 / aspectRatio;
+
                 const bgElement: EditorElement = {
                     id: 'bg-layer',
                     type: 'image',
@@ -143,16 +155,19 @@ const FileEditorModal: React.FC<FileEditorModalProps> = ({
                     x: 0,
                     y: 0,
                     rotation: 0,
-                    width: 595, // Default A4 width
-                    height: 842, // Default A4 height
+                    width: canvasWidth,
+                    height: canvasHeight,
                     opacity: 1,
-                    aspectRatio: 595 / 842
+                    aspectRatio: aspectRatio,
+                    locked: true // Lock the background layer
                 };
                 
                 // Load existing elements
                 const initialElements = item.canvasElements || [];
                 editorState.actions.loadState({
                     ...editorState.state,
+                    canvasWidth: canvasWidth,
+                    canvasHeight: canvasHeight,
                     pages: [{ id: 'page-1', elements: [bgElement, ...initialElements], backgroundColor: '#ffffff' }]
                 });
                 setIsCanvasInitialized(true);
@@ -374,6 +389,46 @@ const FileEditorModal: React.FC<FileEditorModalProps> = ({
                 
                 {/* CENTER MAIN VIEW */}
                 <div className="flex-1 bg-[#1a1a1a] relative flex items-center justify-center overflow-auto p-4 md:p-8 pb-20 lg:pb-8">
+                     <Toolbar 
+                        activeSidebar={null} // Need to manage this state
+                        onClose={() => {}}
+                        onAddElement={editorState.actions.addElement}
+                        onSetBackground={editorState.actions.setBackgroundColor}
+                        onApplyLayout={editorState.actions.applyLayout}
+                        backgroundColor={editorState.state.pages.find(p => p.id === editorState.state.currentPageId)?.backgroundColor || '#ffffff'}
+                        isGenerating={editorState.state.isGenerating}
+                        setIsGenerating={editorState.actions.setIsGenerating}
+                        customColors={editorState.state.customColors}
+                        onAddCustomColor={editorState.actions.addCustomColor}
+                        onUpdateContext={editorState.actions.setAiContext}
+                        aiContext={editorState.state.aiContext}
+                        elements={editorState.state.pages.find(p => p.id === editorState.state.currentPageId)?.elements || []}
+                        selectedIds={editorState.state.selectedIds}
+                        onSelect={editorState.actions.selectElement}
+                        onAlign={editorState.actions.alignElements}
+                        onMoveLayer={editorState.actions.moveLayer}
+                        onReorderElement={editorState.actions.reorderElement}
+                        onDeleteElement={editorState.actions.deleteElement}
+                        getSelectionImage={async () => null} // Need to implement
+                        onQuickSave={handleSaveAndClose}
+                        onSaveProject={() => {}}
+                        onDownloadImage={() => {}}
+                        onDownloadSelection={() => {}}
+                        hasSaved={true}
+                        fileInputRef={useRef(null)}
+                        handleLoadProject={() => {}}
+                        canvasWidth={editorState.state.canvasWidth}
+                        canvasHeight={editorState.state.canvasHeight}
+                        showGrid={editorState.state.showGrid}
+                        snapToGrid={editorState.state.snapToGrid}
+                        onSetSize={editorState.actions.setSize}
+                        onSetShowGrid={editorState.actions.setShowGrid}
+                        onSetSnapToGrid={editorState.actions.setSnapToGrid}
+                        onToggleOrientation={editorState.actions.toggleOrientation}
+                        onLogout={() => {}}
+                        onOpenDrivePicker={() => {}}
+                     />
+                     
                      {isLoadingPreview && (
                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 backdrop-blur-sm">
                              <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -409,6 +464,19 @@ const FileEditorModal: React.FC<FileEditorModalProps> = ({
                             canvasRef={canvasRef}
                          />
                      </div>
+                     
+                     <PropertiesPanel 
+                        selectedElement={editorState.state.pages.find(p => p.id === editorState.state.currentPageId)?.elements.find(el => el.id === editorState.state.selectedIds[0]) || null}
+                        onUpdateElement={(updates) => {
+                            const id = editorState.state.selectedIds[0];
+                            if (id) editorState.actions.updateElement(id, updates);
+                        }}
+                        onDeleteElement={editorState.actions.deleteElement}
+                        onDuplicate={editorState.actions.duplicateElement}
+                        onMoveLayer={editorState.actions.moveLayer}
+                        customColors={editorState.state.customColors}
+                        onAddCustomColor={editorState.actions.addCustomColor}
+                     />
                 </div>
                 
                 {/* RIGHT PANEL: Tools (Modularized) */}
