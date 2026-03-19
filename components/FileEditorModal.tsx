@@ -11,7 +11,9 @@ import {
     DEFAULT_FOOTER_CONFIG
 } from '../services/pdfService';
 import { uploadToDrive } from '../services/driveService';
-import EditorToolsPanel from './EditorToolsPanel';
+import { CanvasWorkspace } from '../sandra_canvas_code/CanvasWorkspace';
+import { useEditorState } from '../sandra_canvas_code/useEditorState';
+import { EditorElement } from '../sandra_canvas_code/canvas_types';
 
 // --- SUB-COMPONENT: Sidebar Thumbnail ---
 
@@ -93,7 +95,9 @@ const FileEditorModal: React.FC<FileEditorModalProps> = ({
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [pdfDocProxy, setPdfDocProxy] = useState<any>(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-    const mainCanvasRef = useRef<HTMLCanvasElement>(null);
+    const [isCanvasInitialized, setIsCanvasInitialized] = useState(false);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const editorState = useEditorState();
     const [isLoadingPreview, setIsLoadingPreview] = useState(true);
     const [isSavingImage, setIsSavingImage] = useState(false);
     const [isSavingThumbnail, setIsSavingThumbnail] = useState(false);
@@ -130,6 +134,29 @@ const FileEditorModal: React.FC<FileEditorModalProps> = ({
                 setPdfDocProxy(pdf);
                 setTotalPages(pdf.numPages);
                 
+                // --- BACKGROUND LAYER LOGIC ---
+                const bgUrl = isPdfType ? previewUrl : item.blobUrl || '';
+                const bgElement: EditorElement = {
+                    id: 'bg-layer',
+                    type: 'image',
+                    src: bgUrl,
+                    x: 0,
+                    y: 0,
+                    rotation: 0,
+                    width: 595, // Default A4 width
+                    height: 842, // Default A4 height
+                    opacity: 1,
+                    aspectRatio: 595 / 842
+                };
+                
+                // Load existing elements
+                const initialElements = item.canvasElements || [];
+                editorState.actions.loadState({
+                    ...editorState.state,
+                    pages: [{ id: 'page-1', elements: [bgElement, ...initialElements], backgroundColor: '#ffffff' }]
+                });
+                setIsCanvasInitialized(true);
+
                 // If it's a new item without meta but has legacy text, init meta
                 if ((!item.pageMeta || Object.keys(item.pageMeta).length === 0) && (item.headerText || item.description)) {
                      const initMeta: PageMetadata = { 
@@ -178,15 +205,7 @@ const FileEditorModal: React.FC<FileEditorModalProps> = ({
         return () => clearTimeout(t);
     }, [pageMeta]);
 
-    // 3. Render Main Canvas when Page or Doc changes
-    useEffect(() => {
-        const renderMain = async () => { 
-            if (pdfDocProxy && mainCanvasRef.current) {
-                await renderPdfPageToCanvas(pdfDocProxy, activePageIndex + 1, mainCanvasRef.current, 1.5); 
-            }
-        };
-        renderMain();
-    }, [pdfDocProxy, activePageIndex]);
+    // 3. Render Main Canvas when Page or Doc changes (Removed as canvas is now handled by CanvasWorkspace)
 
 
     // --- HANDLERS ---
@@ -228,6 +247,11 @@ const FileEditorModal: React.FC<FileEditorModalProps> = ({
     const handleSaveAndClose = async () => {
         setIsSavingThumbnail(true);
         try {
+            // Save canvas elements
+            const currentPage = editorState.state.pages.find((p: any) => p.id === editorState.state.currentPageId);
+            const elementsToSave = currentPage?.elements.filter((el: any) => el.id !== 'bg-layer') || [];
+            onUpdate({ canvasElements: elementsToSave });
+
             if (previewBlob) {
                // Update the thumbnail for the main list view based on current edits
                const newThumb = await generatePageThumbnail(previewBlob, 0, 0.5);
@@ -369,21 +393,26 @@ const FileEditorModal: React.FC<FileEditorModalProps> = ({
                      )}
                      
                      <div className="shadow-2xl bg-white relative transition-transform duration-200">
-                         <canvas ref={mainCanvasRef} className="block max-w-full max-h-[75vh] md:max-h-[85vh] h-auto w-auto" />
+                         <CanvasWorkspace 
+                            elements={editorState.state.pages.find(p => p.id === editorState.state.currentPageId)?.elements || []}
+                            selectedIds={editorState.state.selectedIds}
+                            editingId={editorState.state.editingId}
+                            backgroundColor={editorState.state.pages.find(p => p.id === editorState.state.currentPageId)?.backgroundColor || '#ffffff'}
+                            showGrid={editorState.state.showGrid}
+                            snapToGrid={editorState.state.snapToGrid}
+                            onSelect={editorState.actions.selectElement}
+                            onEdit={editorState.actions.setEditingId}
+                            onUpdateElement={editorState.actions.updateElement}
+                            onAddSnapshot={editorState.actions.addSnapshot}
+                            width={editorState.state.canvasWidth}
+                            height={editorState.state.canvasHeight}
+                            canvasRef={canvasRef}
+                         />
                      </div>
                 </div>
                 
                 {/* RIGHT PANEL: Tools (Modularized) */}
-                <EditorToolsPanel 
-                    activeSection={activeSection}
-                    setActiveSection={setActiveSection}
-                    currentConfig={currentConfig}
-                    updateActiveConfig={updateActiveConfig}
-                    pageMeta={getCurrentMeta()}
-                    updateCurrentMeta={updateCurrentMeta}
-                    focusedLineId={focusedLineId}
-                    setFocusedLineId={setFocusedLineId}
-                />
+                {/* Tools panel removed as per upgrade */}
             </div>
         </div>
     );
