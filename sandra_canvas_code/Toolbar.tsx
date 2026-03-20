@@ -47,8 +47,8 @@ interface ToolbarProps {
   onDownloadImage: (format: 'png' | 'jpeg') => void;
   onDownloadSelection: (format: 'png' | 'jpeg') => void;
   hasSaved: boolean;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
-  handleLoadProject: (e: React.ChangeEvent<HTMLInputElement>, ref: React.RefObject<HTMLInputElement | null>) => void;
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  handleLoadProject: (e: React.ChangeEvent<HTMLInputElement>, ref: React.RefObject<HTMLInputElement>) => void;
   // Canvas actions
   canvasWidth: number;
   canvasHeight: number;
@@ -120,8 +120,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   */
   const prompt = '';
   const setPrompt = (p: string) => {};
-  const aiSubTab = 'IMAGE';
-  const setAiSubTab = (t: string) => {};
+  const [aiSubTab, setAiSubTab] = useState<'IMAGE' | 'TEXT'>('IMAGE');
   const useSelectionAsContext = false;
   const setUseSelectionAsContext = (b: boolean) => {};
   const handleGenerateAi = () => {};

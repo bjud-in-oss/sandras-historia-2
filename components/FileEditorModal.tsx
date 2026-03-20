@@ -415,7 +415,7 @@ const FileEditorModal: React.FC<FileEditorModalProps> = ({
                         onDownloadImage={() => {}}
                         onDownloadSelection={() => {}}
                         hasSaved={true}
-                        fileInputRef={useRef(null)}
+                        fileInputRef={fileInputRef}
                         handleLoadProject={() => {}}
                         canvasWidth={editorState.state.canvasWidth}
                         canvasHeight={editorState.state.canvasHeight}
